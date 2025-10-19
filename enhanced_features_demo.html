@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced NoteTaker Features Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .demo-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            margin: 5px;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-save { background: #28a745; color: white; }
+        .btn-translate { background: #17a2b8; color: white; }
+        .btn-complete { background: #6f42c1; color: white; }
+        .btn-delete { background: #dc3545; color: white; }
+        
+        .btn:hover { transform: translateY(-1px); }
+        .btn:disabled { background: #6c757d; cursor: not-allowed; transform: none; }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-input, .form-textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            font-family: inherit;
+        }
+        
+        .form-textarea {
+            min-height: 250px;
+            resize: vertical;
+        }
+        
+        .feature-demo {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .translation-demo {
+            border-left-color: #17a2b8;
+        }
+        
+        .completion-demo {
+            border-left-color: #6f42c1;
+        }
+        
+        .demo-content {
+            background: #ffffff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
+        .suggestions-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .suggestion-item {
+            background: #e7f3ff;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border-left: 3px solid #6f42c1;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .suggestion-item:hover {
+            background: #cce7ff;
+            transform: translateX(3px);
+        }
+        
+        .improvements-list .suggestion-item {
+            background: #fff3cd;
+            border-left-color: #f39c12;
+        }
+        
+        .improvements-list .suggestion-item:hover {
+            background: #ffe8a1;
+        }
+        
+        .additional-content {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .feature-header {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="feature-header">
+        <h1>🤖 Enhanced NoteTaker Features</h1>
+        <p>AI-Powered Translation & Auto-Completion Demo</p>
+    </div>
+
+    <div class="demo-container">
+        <h2>📝 Sample Note Editor</h2>
+        <p>Try the enhanced features with this sample note:</p>
+        
+        <div class="form-group">
+            <label class="form-label" for="demoTitle">Note Title</label>
+            <input type="text" class="form-input" id="demoTitle" 
+                   value="Learning JavaScript Frameworks" placeholder="Enter note title...">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="demoContent">Note Content</label>
+            <textarea class="form-textarea" id="demoContent" placeholder="Start writing your note...">I have been studying React.js for web development. The component-based architecture is interesting. I want to understand state management better and learn about hooks. Next I plan to explore Vue.js and Angular to compare different approaches.</textarea>
+        </div>
+        
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="btn btn-save" onclick="saveDemo()">💾 Save</button>
+            <button class="btn btn-translate" id="translateDemoBtn" onclick="translateDemo()">🌐 Translate</button>
+            <button class="btn btn-complete" id="completeDemoBtn" onclick="completeDemo()">🤖 Auto-Complete</button>
+            <button class="btn btn-delete" onclick="deleteDemo()">🗑️ Delete</button>
+        </div>
+        
+        <div class="feature-grid">
+            <!-- Translation Demo -->
+            <div class="feature-demo translation-demo" id="translationDemo" style="display: none;">
+                <h3>🌐 Translation Feature</h3>
+                <p><strong>API Call:</strong> <code>POST /api/translate</code></p>
+                
+                <div class="demo-content">
+                    <h4>📝 Original → 🈶 Chinese Translation</h4>
+                    <p><strong>Title:</strong><br>
+                    "Learning JavaScript Frameworks" → "学习JavaScript框架"</p>
+                    <p><strong>Content:</strong><br>
+                    "I have been studying React.js..." → "我一直在学习React.js进行网页开发。基于组件的架构很有趣。我想更好地理解状态管理并学习钩子。接下来我计划探索Vue.js和Angular来比较不同的方法。"</p>
+                    
+                    <button class="btn btn-save" onclick="applyTranslationDemo()" style="margin-top: 15px;">
+                        ✨ Apply Translation
+                    </button>
+                </div>
+            </div>
+
+            <!-- Auto-Completion Demo -->
+            <div class="feature-demo completion-demo" id="completionDemo" style="display: none;">
+                <h3>🤖 Auto-Completion Feature</h3>
+                <p><strong>API Call:</strong> <code>POST /api/complete</code></p>
+                
+                <div class="demo-content">
+                    <h4>💡 Content Suggestions</h4>
+                    <ul class="suggestions-list">
+                        <li class="suggestion-item" onclick="insertSuggestion('Consider exploring React hooks like useState and useEffect for better state management.')">
+                            Consider exploring React hooks like useState and useEffect for better state management.
+                        </li>
+                        <li class="suggestion-item" onclick="insertSuggestion('Look into Redux or Context API for global state management in larger applications.')">
+                            Look into Redux or Context API for global state management in larger applications.
+                        </li>
+                        <li class="suggestion-item" onclick="insertSuggestion('Compare performance differences between React, Vue.js, and Angular in real-world applications.')">
+                            Compare performance differences between React, Vue.js, and Angular in real-world applications.
+                        </li>
+                    </ul>
+                    
+                    <h4>✏️ Grammar & Style Improvements</h4>
+                    <ul class="suggestions-list improvements-list">
+                        <li class="suggestion-item">
+                            Consider adding specific examples of what you find interesting about component-based architecture.
+                        </li>
+                        <li class="suggestion-item">
+                            Break the content into paragraphs for better readability.
+                        </li>
+                    </ul>
+                    
+                    <h4>📝 Additional Content</h4>
+                    <div class="additional-content">
+                        <strong>Suggested expansion:</strong><br>
+                        "When comparing these frameworks, consider factors like learning curve, community support, job market demand, and ecosystem maturity. React has the largest community and job market, Vue.js is known for its gentle learning curve, while Angular provides a complete framework solution with TypeScript integration."
+                    </div>
+                    
+                    <button class="btn btn-complete" onclick="appendAdditionalContent()" style="margin-top: 15px;">
+                        ➕ Append Content
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function saveDemo() {
+            alert('💾 Save functionality - This would save the note to your database');
+        }
+        
+        function deleteDemo() {
+            if (confirm('Are you sure you want to delete this note?')) {
+                alert('🗑️ Delete functionality - This would remove the note from your database');
+            }
+        }
+        
+        function translateDemo() {
+            const btn = document.getElementById('translateDemoBtn');
+            const demo = document.getElementById('translationDemo');
+            
+            btn.disabled = true;
+            btn.textContent = '🔄 Translating...';
+            
+            setTimeout(() => {
+                demo.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = '🌐 Translate';
+            }, 2000);
+        }
+        
+        function completeDemo() {
+            const btn = document.getElementById('completeDemoBtn');
+            const demo = document.getElementById('completionDemo');
+            
+            btn.disabled = true;
+            btn.textContent = '🔄 Analyzing...';
+            
+            setTimeout(() => {
+                demo.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = '🤖 Auto-Complete';
+            }, 3000);
+        }
+        
+        function applyTranslationDemo() {
+            document.getElementById('demoTitle').value = '学习JavaScript框架';
+            document.getElementById('demoContent').value = '我一直在学习React.js进行网页开发。基于组件的架构很有趣。我想更好地理解状态管理并学习钩子。接下来我计划探索Vue.js和Angular来比较不同的方法。';
+            
+            document.getElementById('translationDemo').style.display = 'none';
+            alert('✨ Translation applied! The content has been replaced with the Chinese translation.');
+        }
+        
+        function insertSuggestion(suggestion) {
+            const contentTextarea = document.getElementById('demoContent');
+            const currentContent = contentTextarea.value;
+            const newContent = currentContent + '\n\n' + suggestion;
+            contentTextarea.value = newContent;
+            alert('💡 Suggestion added to your note!');
+        }
+        
+        function appendAdditionalContent() {
+            const additionalContent = 'When comparing these frameworks, consider factors like learning curve, community support, job market demand, and ecosystem maturity. React has the largest community and job market, Vue.js is known for its gentle learning curve, while Angular provides a complete framework solution with TypeScript integration.';
+            const contentTextarea = document.getElementById('demoContent');
+            const currentContent = contentTextarea.value;
+            const newContent = currentContent + '\n\n' + additionalContent;
+            contentTextarea.value = newContent;
+            
+            document.getElementById('completionDemo').style.display = 'none';
+            alert('📝 Additional content appended to your note!');
+        }
+    </script>
+</body>
+</html>
