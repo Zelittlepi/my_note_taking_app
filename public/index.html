@@ -170,6 +170,16 @@
                 <button class="test-button" onclick="testDatabase()">Test Database</button>
                 <button class="test-button" onclick="clearResults()">Clear Results</button>
                 
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #eee;">
+                    <h4>🚀 Launch Full App</h4>
+                    <button class="test-button" onclick="launchNoteTaker()" style="background: #4CAF50; font-size: 18px; padding: 15px 30px;">
+                        📝 Launch NoteTaker Interface
+                    </button>
+                    <p style="font-size: 14px; opacity: 0.7; margin-top: 10px;">
+                        Once backend tests pass, click here to use the full note-taking interface
+                    </p>
+                </div>
+                
                 <div id="test-results"></div>
             </div>
 
@@ -257,24 +267,78 @@
             log('🔄 Testing API endpoints...');
             
             const apiEndpoints = [
-                '/api/notes',
-                '/api/translate',
-                '/api/complete',
-                '/debug'
+                { url: '/api/notes', method: 'GET', name: 'Get Notes' },
+                { url: '/api/translate', method: 'POST', name: 'Translation', 
+                  body: { text: 'Hello world' } },
+                { url: '/api/complete', method: 'POST', name: 'Auto-completion',
+                  body: { title: 'Test Note', content: 'This is a test note.' } },
+                { url: '/debug', method: 'GET', name: 'Debug Info' }
             ];
             
             for (const endpoint of apiEndpoints) {
                 try {
-                    const response = await fetch(endpoint);
+                    const options = {
+                        method: endpoint.method,
+                        headers: { 'Content-Type': 'application/json' }
+                    };
+                    
+                    if (endpoint.body) {
+                        options.body = JSON.stringify(endpoint.body);
+                    }
+                    
+                    const response = await fetch(endpoint.url, options);
+                    const data = await response.json();
+                    
                     if (response.ok) {
-                        const data = await response.json();
-                        addResult(`✅ ${endpoint} - Working`, 'success');
+                        addResult(`✅ ${endpoint.name} (${endpoint.url}) - Working`, 'success');
+                        
+                        // Show additional info for specific endpoints
+                        if (endpoint.url === '/api/notes' && data.length !== undefined) {
+                            addResult(`   📊 Found ${data.length} notes`, 'info');
+                        } else if (endpoint.url === '/debug' && data.feature_status) {
+                            const features = data.feature_status;
+                            addResult(`   🗄️ Database: ${features.database_available ? '✅' : '❌'}`, 'info');
+                            addResult(`   🤖 AI: ${features.ai_available ? '✅' : '❌'}`, 'info');
+                        }
                     } else {
-                        addResult(`⚠️ ${endpoint} - Status: ${response.status}`, 'warning');
+                        addResult(`⚠️ ${endpoint.name} - Status: ${response.status}`, 'warning');
+                        if (data.error) {
+                            addResult(`   Error: ${data.error}`, 'warning');
+                        }
                     }
                 } catch (err) {
-                    addResult(`❌ ${endpoint} - ${err.message}`, 'error');
+                    addResult(`❌ ${endpoint.name} - ${err.message}`, 'error');
                 }
+            }
+            
+            // Test note creation if basic API is working
+            try {
+                const createResponse = await fetch('/api/notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: 'Test Note from Frontend',
+                        content: 'This note was created by the diagnostic tool to test the API.'
+                    })
+                });
+                
+                if (createResponse.ok) {
+                    const newNote = await createResponse.json();
+                    addResult(`✅ Note Creation Test - Created note ID: ${newNote.id}`, 'success');
+                    
+                    // Try to delete the test note
+                    const deleteResponse = await fetch(`/api/notes/${newNote.id}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (deleteResponse.ok) {
+                        addResult(`✅ Note Deletion Test - Cleaned up test note`, 'success');
+                    }
+                } else {
+                    addResult(`⚠️ Note Creation Test - Failed`, 'warning');
+                }
+            } catch (err) {
+                addResult(`❌ Note CRUD Test - ${err.message}`, 'error');
             }
         }
 
@@ -313,6 +377,347 @@
                 indicator.classList.add('status-warning');
                 statusElement.innerHTML = '<span class="status-indicator status-warning"></span><strong>Backend: Warning ⚠️</strong>';
             }
+        }
+
+        function launchNoteTaker() {
+            log('🚀 Launching full NoteTaker interface...');
+            
+            // Hide the diagnostic interface
+            document.querySelector('.status-card').style.display = 'none';
+            
+            // Create and show the full interface
+            const fullInterface = document.createElement('div');
+            fullInterface.className = 'full-interface';
+            fullInterface.innerHTML = `
+                <div class="app-container">
+                    <div class="app-header">
+                        <h1>🗒️ NoteTaker</h1>
+                        <div class="header-controls">
+                            <button onclick="showDiagnostics()" class="control-btn">🔧 Diagnostics</button>
+                            <button onclick="refreshNotes()" class="control-btn">🔄 Refresh</button>
+                        </div>
+                    </div>
+                    
+                    <div class="app-main">
+                        <div class="sidebar">
+                            <div class="search-box">
+                                <input type="text" id="searchInput" placeholder="🔍 Search notes..." onkeyup="searchNotes()">
+                            </div>
+                            
+                            <button class="new-note-btn" onclick="createNewNote()">
+                                ➕ New Note
+                            </button>
+                            
+                            <div id="notesList" class="notes-list">
+                                <div class="loading">Loading notes...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="editor-panel">
+                            <div id="editorContent" class="editor-content">
+                                <div class="welcome-message">
+                                    <h2>Welcome to NoteTaker! 🎉</h2>
+                                    <p>Select a note from the sidebar or create a new one to get started.</p>
+                                    <div class="feature-highlights">
+                                        <div class="feature">🤖 AI-powered translation</div>
+                                        <div class="feature">✨ Smart auto-completion</div>
+                                        <div class="feature">🔍 Instant search</div>
+                                        <div class="feature">☁️ Cloud synchronization</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <style>
+                    .full-interface {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100vh;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        z-index: 1000;
+                    }
+                    
+                    .app-container {
+                        max-width: 1400px;
+                        margin: 0 auto;
+                        height: 100vh;
+                        display: flex;
+                        flex-direction: column;
+                        padding: 20px;
+                    }
+                    
+                    .app-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        color: white;
+                        margin-bottom: 20px;
+                    }
+                    
+                    .app-header h1 {
+                        font-size: 2rem;
+                        margin: 0;
+                    }
+                    
+                    .header-controls {
+                        display: flex;
+                        gap: 10px;
+                    }
+                    
+                    .control-btn {
+                        background: rgba(255,255,255,0.2);
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    }
+                    
+                    .control-btn:hover {
+                        background: rgba(255,255,255,0.3);
+                        transform: translateY(-1px);
+                    }
+                    
+                    .app-main {
+                        display: grid;
+                        grid-template-columns: 350px 1fr;
+                        gap: 20px;
+                        height: calc(100vh - 120px);
+                    }
+                    
+                    .sidebar, .editor-panel {
+                        background: rgba(255,255,255,0.95);
+                        backdrop-filter: blur(10px);
+                        border-radius: 15px;
+                        padding: 20px;
+                        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                    }
+                    
+                    .search-box input {
+                        width: 100%;
+                        padding: 12px;
+                        border: 1px solid #ddd;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        margin-bottom: 15px;
+                    }
+                    
+                    .new-note-btn {
+                        width: 100%;
+                        background: #667eea;
+                        color: white;
+                        border: none;
+                        padding: 12px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 16px;
+                        margin-bottom: 20px;
+                        transition: all 0.3s ease;
+                    }
+                    
+                    .new-note-btn:hover {
+                        background: #5a6fd8;
+                        transform: translateY(-1px);
+                    }
+                    
+                    .notes-list {
+                        max-height: calc(100vh - 300px);
+                        overflow-y: auto;
+                    }
+                    
+                    .note-item {
+                        padding: 12px;
+                        border: 1px solid #eee;
+                        border-radius: 8px;
+                        margin-bottom: 10px;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    }
+                    
+                    .note-item:hover {
+                        background: #f8f9fa;
+                        border-color: #667eea;
+                    }
+                    
+                    .note-item.active {
+                        background: #667eea;
+                        color: white;
+                    }
+                    
+                    .note-title {
+                        font-weight: bold;
+                        margin-bottom: 4px;
+                    }
+                    
+                    .note-preview {
+                        font-size: 12px;
+                        opacity: 0.7;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }
+                    
+                    .note-date {
+                        font-size: 11px;
+                        opacity: 0.5;
+                        margin-top: 4px;
+                    }
+                    
+                    .editor-content {
+                        height: 100%;
+                        display: flex;
+                        flex-direction: column;
+                    }
+                    
+                    .welcome-message {
+                        text-align: center;
+                        padding: 40px;
+                        color: #666;
+                    }
+                    
+                    .welcome-message h2 {
+                        color: #667eea;
+                        margin-bottom: 20px;
+                    }
+                    
+                    .feature-highlights {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 15px;
+                        margin-top: 30px;
+                    }
+                    
+                    .feature {
+                        background: rgba(102, 126, 234, 0.1);
+                        padding: 15px;
+                        border-radius: 8px;
+                        font-size: 14px;
+                    }
+                    
+                    .loading {
+                        text-align: center;
+                        padding: 20px;
+                        color: #666;
+                        font-style: italic;
+                    }
+                    
+                    @media (max-width: 768px) {
+                        .app-main {
+                            grid-template-columns: 1fr;
+                            grid-template-rows: auto 1fr;
+                        }
+                        
+                        .sidebar {
+                            max-height: 200px;
+                        }
+                    }
+                </style>
+            `;
+            
+            document.body.appendChild(fullInterface);
+            
+            // Initialize the note-taking interface
+            initializeNoteTaker();
+        }
+        
+        function showDiagnostics() {
+            // Remove full interface and show diagnostics
+            const fullInterface = document.querySelector('.full-interface');
+            if (fullInterface) {
+                fullInterface.remove();
+            }
+            document.querySelector('.status-card').style.display = 'block';
+        }
+        
+        async function initializeNoteTaker() {
+            log('🔄 Initializing NoteTaker interface...');
+            await loadNotes();
+        }
+        
+        async function loadNotes() {
+            const notesList = document.getElementById('notesList');
+            notesList.innerHTML = '<div class="loading">Loading notes...</div>';
+            
+            try {
+                const response = await fetch('/api/notes');
+                if (response.ok) {
+                    const notes = await response.json();
+                    displayNotes(notes);
+                    log(`✅ Loaded ${notes.length} notes`);
+                } else {
+                    notesList.innerHTML = '<div class="loading">Failed to load notes. Check backend connection.</div>';
+                }
+            } catch (error) {
+                notesList.innerHTML = '<div class="loading">Error loading notes. Backend not available.</div>';
+                log(`❌ Failed to load notes: ${error.message}`);
+            }
+        }
+        
+        function displayNotes(notes) {
+            const notesList = document.getElementById('notesList');
+            
+            if (notes.length === 0) {
+                notesList.innerHTML = '<div class="loading">No notes yet. Create your first note!</div>';
+                return;
+            }
+            
+            notesList.innerHTML = notes.map(note => `
+                <div class="note-item" onclick="openNote(${note.id})">
+                    <div class="note-title">${escapeHtml(note.title)}</div>
+                    <div class="note-preview">${escapeHtml(note.content.substring(0, 100))}...</div>
+                    <div class="note-date">${new Date(note.created_at).toLocaleDateString()}</div>
+                </div>
+            `).join('');
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        async function createNewNote() {
+            const title = prompt('Enter note title:');
+            if (!title) return;
+            
+            const content = prompt('Enter note content:');
+            if (!content) return;
+            
+            try {
+                const response = await fetch('/api/notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, content })
+                });
+                
+                if (response.ok) {
+                    await loadNotes();
+                    log('✅ New note created successfully');
+                } else {
+                    alert('Failed to create note');
+                }
+            } catch (error) {
+                alert('Error creating note: ' + error.message);
+            }
+        }
+        
+        async function refreshNotes() {
+            await loadNotes();
+        }
+        
+        function searchNotes() {
+            // TODO: Implement search functionality
+            log('🔍 Search functionality coming soon...');
+        }
+        
+        function openNote(noteId) {
+            // TODO: Implement note editing
+            log(`📝 Opening note ${noteId}...`);
         }
 
         // Auto-test on page load
