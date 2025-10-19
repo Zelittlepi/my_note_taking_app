@@ -200,6 +200,120 @@
             transform: translateY(-1px);
         }
 
+        .btn-translate {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-translate:hover {
+            background: #138496;
+            transform: translateY(-1px);
+        }
+
+        .btn-translate:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .translation-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .translation-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+
+        .translation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f1f1f1;
+            padding-bottom: 15px;
+        }
+
+        .translation-title {
+            font-size: 1.5rem;
+            color: #333;
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 5px;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .translation-section {
+            margin-bottom: 25px;
+        }
+
+        .translation-label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 10px;
+            display: block;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .translation-text {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #17a2b8;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .original-text {
+            border-left-color: #667eea;
+        }
+
+        .translated-text {
+            border-left-color: #28a745;
+        }
+
+        .translation-loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .translation-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+        }
+
         .form-group {
             margin-bottom: 20px;
         }
@@ -345,6 +459,7 @@
                     <h2 class="editor-title" id="editorTitle">Select a note to edit</h2>
                     <div class="editor-actions" id="editorActions" style="display: none;">
                         <button class="btn btn-save" id="saveBtn">💾 Save</button>
+                        <button class="btn btn-translate" id="translateBtn">🌐 Translate</button>
                         <button class="btn btn-delete" id="deleteBtn">🗑️ Delete</button>
                     </div>
                 </div>
@@ -371,6 +486,22 @@
         </div>
     </div>
 
+    <!-- Translation Modal -->
+    <div class="translation-modal" id="translationModal">
+        <div class="translation-content">
+            <div class="translation-header">
+                <h3 class="translation-title">Translation Result</h3>
+                <button class="close-btn" id="closeTranslationBtn">&times;</button>
+            </div>
+            
+            <div id="translationResult">
+                <div class="translation-loading">
+                    <p>🔄 Translating your note...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         class NoteTaker {
             constructor() {
@@ -389,7 +520,16 @@
                 document.getElementById('newNoteBtn').addEventListener('click', () => this.createNewNote());
                 document.getElementById('saveBtn').addEventListener('click', () => this.saveNote());
                 document.getElementById('deleteBtn').addEventListener('click', () => this.deleteNote());
+                document.getElementById('translateBtn').addEventListener('click', () => this.translateNote());
                 document.getElementById('searchBox').addEventListener('input', (e) => this.searchNotes(e.target.value));
+                
+                // Translation modal events
+                document.getElementById('closeTranslationBtn').addEventListener('click', () => this.closeTranslationModal());
+                document.getElementById('translationModal').addEventListener('click', (e) => {
+                    if (e.target.id === 'translationModal') {
+                        this.closeTranslationModal();
+                    }
+                });
                 
                 // Auto-save on content change (debounced)
                 let saveTimeout;
@@ -593,6 +733,152 @@
                         <div class="note-date">${this.formatDate(note.updated_at)}</div>
                     </div>
                 `).join('');
+            }
+
+            async translateNote() {
+                if (!this.currentNote) {
+                    this.showMessage('Please select a note to translate', 'error');
+                    return;
+                }
+
+                const title = document.getElementById('noteTitle').value.trim();
+                const content = document.getElementById('noteContent').value.trim();
+
+                if (!title && !content) {
+                    this.showMessage('Note is empty. Nothing to translate.', 'error');
+                    return;
+                }
+
+                // Show translation modal with loading state
+                this.showTranslationModal();
+                
+                try {
+                    const translateBtn = document.getElementById('translateBtn');
+                    translateBtn.disabled = true;
+                    translateBtn.textContent = '🔄 Translating...';
+
+                    let translationResult;
+
+                    if (this.currentNote.id) {
+                        // Translate existing note using the note endpoint
+                        const response = await fetch(`/api/notes/${this.currentNote.id}/translate`, {
+                            method: 'POST'
+                        });
+
+                        if (!response.ok) throw new Error('Failed to translate note');
+                        translationResult = await response.json();
+                    } else {
+                        // For new notes, translate the current content
+                        const response = await fetch('/api/translate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                text: `Title: ${title}\n\nContent: ${content}`
+                            })
+                        });
+
+                        if (!response.ok) throw new Error('Failed to translate text');
+                        const data = await response.json();
+                        
+                        // Parse the translated text to separate title and content
+                        const translatedLines = data.translated_text.split('\n');
+                        const translatedTitle = translatedLines[0].replace(/^标题[:：]\s*/, '');
+                        const translatedContent = translatedLines.slice(2).join('\n').replace(/^内容[:：]\s*/, '');
+
+                        translationResult = {
+                            original: { title, content },
+                            translated: { 
+                                title: translatedTitle, 
+                                content: translatedContent 
+                            }
+                        };
+                    }
+
+                    this.displayTranslationResult(translationResult);
+
+                } catch (error) {
+                    this.showMessage(`Translation failed: ${error.message}`, 'error');
+                    this.closeTranslationModal();
+                } finally {
+                    const translateBtn = document.getElementById('translateBtn');
+                    translateBtn.disabled = false;
+                    translateBtn.textContent = '🌐 Translate';
+                }
+            }
+
+            showTranslationModal() {
+                const modal = document.getElementById('translationModal');
+                const result = document.getElementById('translationResult');
+                
+                result.innerHTML = `
+                    <div class="translation-loading">
+                        <p>🔄 Translating your note...</p>
+                        <p style="font-size: 14px; color: #666; margin-top: 10px;">This may take a few seconds...</p>
+                    </div>
+                `;
+                
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            }
+
+            closeTranslationModal() {
+                const modal = document.getElementById('translationModal');
+                modal.style.display = 'none';
+                document.body.style.overflow = 'auto';
+            }
+
+            displayTranslationResult(result) {
+                const resultContainer = document.getElementById('translationResult');
+                
+                resultContainer.innerHTML = `
+                    <div class="translation-section">
+                        <span class="translation-label">📝 Original Title (English)</span>
+                        <div class="translation-text original-text">${this.escapeHtml(result.original.title || 'Untitled')}</div>
+                    </div>
+                    
+                    <div class="translation-section">
+                        <span class="translation-label">🌐 Translated Title (Chinese)</span>
+                        <div class="translation-text translated-text">${this.escapeHtml(result.translated.title || 'No translation')}</div>
+                    </div>
+                    
+                    <div class="translation-section">
+                        <span class="translation-label">📄 Original Content (English)</span>
+                        <div class="translation-text original-text">${this.escapeHtml(result.original.content || 'No content').replace(/\n/g, '<br>')}</div>
+                    </div>
+                    
+                    <div class="translation-section">
+                        <span class="translation-label">🈶 Translated Content (Chinese)</span>
+                        <div class="translation-text translated-text">${this.escapeHtml(result.translated.content || 'No translation').replace(/\n/g, '<br>')}</div>
+                    </div>
+                    
+                    <div class="translation-actions">
+                        <button class="btn btn-save" onclick="noteTaker.applyTranslation('${this.escapeForAttribute(result.translated.title)}', '${this.escapeForAttribute(result.translated.content)}')">
+                            ✨ Apply Translation
+                        </button>
+                    </div>
+                `;
+            }
+
+            applyTranslation(translatedTitle, translatedContent) {
+                // Unescape the content
+                const title = this.unescapeAttribute(translatedTitle);
+                const content = this.unescapeAttribute(translatedContent);
+                
+                // Apply to current form
+                document.getElementById('noteTitle').value = title;
+                document.getElementById('noteContent').value = content;
+                document.getElementById('editorTitle').textContent = title || 'Translated Note';
+                
+                this.closeTranslationModal();
+                this.showMessage('Translation applied! Don\'t forget to save your note.', 'success');
+            }
+
+            escapeForAttribute(text) {
+                return text.replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/\n/g, '\\n');
+            }
+
+            unescapeAttribute(text) {
+                return text.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\\n/g, '\n');
             }
 
             showMessage(message, type) {
